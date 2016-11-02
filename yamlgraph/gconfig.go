@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Package gconfig provides the facilities for loading a graph from a yaml file.
-package gconfig
+// Package yamlgraph provides the facilities for loading a graph from a yaml file.
+package yamlgraph
 
 import (
 	"errors"
@@ -74,7 +74,6 @@ type GraphConfig struct {
 	Collector []collectorResConfig `yaml:"collect"`
 	Edges     []Edge               `yaml:"edges"`
 	Comment   string               `yaml:"comment"`
-	Hostname  string               `yaml:"hostname"` // uuid for the host
 	Remote    string               `yaml:"remote"`
 }
 
@@ -175,7 +174,7 @@ func (c *GraphConfig) NewGraphFromConfig(g *pgraph.Graph, embdEtcd *etcd.EmbdEtc
 		}
 	}
 	// store in etcd
-	if err := etcd.EtcdSetResources(embdEtcd, c.Hostname, resourceList); err != nil {
+	if err := etcd.EtcdSetResources(embdEtcd, hostname, resourceList); err != nil {
 		return nil, fmt.Errorf("Config: Could not export resources: %v", err)
 	}
 
@@ -270,4 +269,21 @@ func (c *GraphConfig) NewGraphFromConfig(g *pgraph.Graph, embdEtcd *etcd.EmbdEtc
 	}
 
 	return graph, nil
+}
+
+// ParseConfigFromFile takes a filename and returns the graph config structure.
+func ParseConfigFromFile(filename string) *GraphConfig {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Printf("Config: Error: ParseConfigFromFile: File: %v", err)
+		return nil
+	}
+
+	var config GraphConfig
+	if err := config.Parse(data); err != nil {
+		log.Printf("Config: Error: ParseConfigFromFile: Parse: %v", err)
+		return nil
+	}
+
+	return &config
 }

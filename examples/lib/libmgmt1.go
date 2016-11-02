@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/purpleidea/mgmt/gconfig"
+	"github.com/purpleidea/mgmt/yamlgraph"
 	mgmt "github.com/purpleidea/mgmt/mgmtmain"
 	"github.com/purpleidea/mgmt/resources"
 )

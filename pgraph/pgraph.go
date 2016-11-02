@@ -19,7 +19,6 @@
 package pgraph
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -36,6 +35,8 @@ import (
 	"github.com/purpleidea/mgmt/event"
 	"github.com/purpleidea/mgmt/global"
 	"github.com/purpleidea/mgmt/resources"
+
+	errwrap "github.com/pkg/errors"
 )
 
 //go:generate stringer -type=graphState -output=graphstate_stringer.go
@@ -285,11 +286,11 @@ func (g *Graph) ExecGraphviz(program, filename string) error {
 	switch program {
 	case "dot", "neato", "twopi", "circo", "fdp":
 	default:
-		return errors.New("Invalid graphviz program selected!")
+		return fmt.Errorf("Invalid graphviz program selected!")
 	}
 
 	if filename == "" {
-		return errors.New("No filename given!")
+		return fmt.Errorf("No filename given!")
 	}
 
 	// run as a normal user if possible when run with sudo
@@ -298,18 +299,18 @@ func (g *Graph) ExecGraphviz(program, filename string) error {
 
 	err := ioutil.WriteFile(filename, []byte(g.Graphviz()), 0644)
 	if err != nil {
-		return errors.New("Error writing to filename!")
+		return fmt.Errorf("Error writing to filename!")
 	}
 
 	if err1 == nil && err2 == nil {
 		if err := os.Chown(filename, uid, gid); err != nil {
-			return errors.New("Error changing file owner!")
+			return fmt.Errorf("Error changing file owner!")
 		}
 	}
 
 	path, err := exec.LookPath(program)
 	if err != nil {
-		return errors.New("Graphviz is missing!")
+		return fmt.Errorf("Graphviz is missing!")
 	}
 
 	out := fmt.Sprintf("%v.png", filename)
@@ -324,7 +325,7 @@ func (g *Graph) ExecGraphviz(program, filename string) error {
 	}
 	_, err = cmd.Output()
 	if err != nil {
-		return errors.New("Error writing to image!")
+		return fmt.Errorf("Error writing to image!")
 	}
 	return nil
 }
@@ -468,7 +469,7 @@ func (g *Graph) OutDegree() map[*Vertex]int {
 // TopologicalSort returns the sort of graph vertices in that order.
 // based on descriptions and code from wikipedia and rosetta code
 // TODO: add memoization, and cache invalidation to speed this up :)
-func (g *Graph) TopologicalSort() (result []*Vertex, ok bool) { // kahn's algorithm
+func (g *Graph) TopologicalSort() ([]*Vertex, error) { // kahn's algorithm
 	var L []*Vertex                    // empty list that will contain the sorted elements
 	var S []*Vertex                    // set of all nodes with no incoming edges
 	remaining := make(map[*Vertex]int) // amount of edges remaining
@@ -505,13 +506,13 @@ func (g *Graph) TopologicalSort() (result []*Vertex, ok bool) { // kahn's algori
 		if in > 0 {
 			for n := range g.Adjacency[c] {
 				if remaining[n] > 0 {
-					return nil, false // not a dag!
+					return nil, fmt.Errorf("Not a dag!")
 				}
 			}
 		}
 	}
 
-	return L, true
+	return L, nil
 }
 
 // Reachability finds the shortest path in a DAG from a to b, and returns the
@@ -948,6 +949,16 @@ func (g *Graph) AssociateData(converger converger.Converger) {
 
 // VertexContains is an "in array" function to test for a vertex in a slice of vertices.
 func VertexContains(needle *Vertex, haystack []*Vertex) bool {
+	for _, v := range haystack {
+		if needle == v {
+			return true
+		}
+	}
+	return false
+}
+
+// EdgeContains is an "in array" function to test for an edge in a slice of edges.
+func EdgeContains(needle *Edge, haystack []*Edge) bool {
 	for _, v := range haystack {
 		if needle == v {
 			return true
